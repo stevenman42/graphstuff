@@ -4,6 +4,16 @@ import pygame
 pygame.font.init()
 myfont = pygame.font.SysFont('Helvetica', 14)
 
+
+# TODO: use this class to make stuff more organized
+class Graph():
+    def __init__(self):
+        self.vertex_list = []
+
+    def draw_vertices(self, screen):
+        # pass
+        return
+
 class Vertex():
     def __init__(self, x, y, width):
         self.rect = pygame.Rect(x, y, width, width)
@@ -16,8 +26,8 @@ class Vertex():
         self.name = ""
         self.draw_outline = False
         self.outline = pygame.Rect(self.rect.x - 5, self.rect.y - 5, 30, 30)
-        self.offset_x = 0
-        self.offset_y = 0
+        self.dragging_initial_x = 0
+        self.dragging_initial_y = 0
 
     def adjoin(self, vertex):
         if not vertex in self.neighbors:
@@ -43,18 +53,18 @@ def print_latex(vertexlist, SCREENWIDTH, SCREENHEIGHT):
     scale = 10
     output = "\\begin{tikzpicture}[shorten >=1pt,->]\n\\tikzstyle{vertex}=[circle,fill=black!35,minimum size=12pt,inner sep=2pt]\n"
 
-    for v in range(len(vertexlist)):
+    for v in range(len(G.vertex_list)):
 
-        x_pos = str((-1*vertexlist[v].x + SCREENWIDTH / 2)*scale / SCREENWIDTH)
-        y_pos = str((-1*vertexlist[v].y + SCREENHEIGHT / 2)*scale / SCREENHEIGHT)
+        x_pos = str((-1*G.vertex_list[v].x + SCREENWIDTH / 2)*scale / SCREENWIDTH)
+        y_pos = str((-1*G.vertex_list[v].y + SCREENHEIGHT / 2)*scale / SCREENHEIGHT)
 
         output += "\\node[vertex] (G_" + str(v+1) + ") at (" + x_pos + ", " + y_pos + ") {" + str(v+1) + "};\n"
-        vertexlist[v].name = "G_" + str(v+1)
+        G.vertex_list[v].name = "G_" + str(v+1)
 
         # print("the vertex " + vertexlist[v].name + " at position (" + str(vertexlist[v].x) + ", " + str(vertexlist[v].y) + ") has x_pos: " + x_pos + " and y_pos: " + y_pos  )
 
     output += "\\draw "
-    for vertex in vertexlist:
+    for vertex in G.vertex_list:
         for neighbor in vertex.neighbors:
             output += "(" + vertex.name + ") -- (" + neighbor.name + ") "
     output += "-- cycle;\n"
@@ -73,7 +83,7 @@ def main():
     spacing_button = pygame.Rect(0,SCREENHEIGHT - 20,140,20)
     spacing_button_text = myfont.render('distribute points', False, (0, 0, 0))
     # vertex1 = Vertex(300, 220, 20)
-    vertexlist = []
+    G = Graph()
     addingneighbor = False
     add = True
 
@@ -90,7 +100,8 @@ def main():
     while not done:
         for event in pygame.event.get():
 
-            for vertex in vertexlist:
+            # draw an outline around a vertex if the cursor is over it
+            for vertex in G.vertex_list:
                 if (vertex.rect.collidepoint(pygame.mouse.get_pos()) and not pygame.mouse.get_pressed()[0] == 1) or vertex in selected_vertices:
                     vertex.draw_outline = True
                 else:
@@ -99,14 +110,16 @@ def main():
             if event.type == pygame.QUIT:
                 done = True
 
+            # press space to print LaTeX code to the console that will render the current graph
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    print_latex(vertexlist, SCREENWIDTH, SCREENHEIGHT)
+                    print_latex(G.vertex_list, SCREENWIDTH, SCREENHEIGHT)
 
             if event.type == pygame.MOUSEBUTTONDOWN:
+                # right click
                 if event.button == 3:
 
-                    for vertex in vertexlist:
+                    for vertex in G.vertex_list:
                         if vertex.rect.collidepoint(pygame.mouse.get_pos()) == True:
                             add = False
                             vertex.addingneighbor = True
@@ -115,19 +128,21 @@ def main():
                             print("release the right mouse button on the next vertex")
 
                     if add:
-                        vertexlist.append(Vertex(event.pos[0] - 10, event.pos[1] - 10, 20))
+                        G.vertex_list.append(Vertex(event.pos[0] - 10, event.pos[1] - 10, 20))
                         break
                     add = True
 
+                # left click
                 if event.button == 1:
 
+                    # the distribute points button was clicked
                     if spacing_button.collidepoint(pygame.mouse.get_pos()) == True:
-                        for vertex in vertexlist:
+                        for vertex in G.vertex_list:
                             vertex.snap()
                         break
 
                     clicked_a_vertex = False
-                    for vertex in vertexlist:
+                    for vertex in G.vertex_list:
                         vertex.draw_outline = False
                         if vertex.rect.collidepoint(event.pos):
                             for v in selected_vertices:
@@ -136,8 +151,14 @@ def main():
                             # for v in selected_vertices:
                             #     v.dragging = True
                             mouse_x, mouse_y = event.pos
-                            offset_x = vertex.rect.x - mouse_x
-                            offset_y = vertex.rect.y - mouse_y
+#                            offset_x = vertex.rect.x - mouse_x
+#                            offset_y = vertex.rect.y - mouse_y
+
+                            initial_mouse_x = mouse_x
+                            initial_mouse_y = mouse_y
+                            vertex.dragging_initial_x = vertex.x
+                            vertex.dragging_initial_y = vertex.y
+
                             clicked_a_vertex = True
                             break
                     if not clicked_a_vertex:
@@ -149,11 +170,10 @@ def main():
 
             elif event.type == pygame.MOUSEBUTTONUP:
 
+                # when left click is released and we have some vertices selected
                 if selecting:
-
-
                     selecting = False
-                    for vertex in vertexlist:
+                    for vertex in G.vertex_list:
                         if vertex.rect.colliderect(selection):
                             print("true")
                             if not vertex in selected_vertices:
@@ -172,7 +192,7 @@ def main():
                     selection.height = 0
 
 
-                for vertex in vertexlist:
+                for vertex in G.vertex_list:
                     if event.button == 3:
                         if vertex.rect.collidepoint(pygame.mouse.get_pos()):
                             if addingneighbor and not addvertex == vertex:
@@ -190,15 +210,17 @@ def main():
 
 
 
-                for vertex in vertexlist:
+                for vertex in G.vertex_list:
 
                     if vertex.rect.colliderect(selection):
                         vertex.draw_outline = True
 
                     if vertex.dragging == True:
                         mouse_x, mouse_y = event.pos
-                        vertex.rect.x = mouse_x + offset_x
-                        vertex.rect.y = mouse_y + offset_y
+                        delta_x = mouse_x - initial_mouse_x
+                        delta_y = mouse_y - initial_mouse_y
+                        vertex.rect.x = vertex.dragging_initial_x + delta_x
+                        vertex.rect.y = vertex.dragging_initial_y + delta_y
 
             if selecting:
                 selection.width = pygame.mouse.get_pos()[0] - selection.x
@@ -217,7 +239,7 @@ def main():
 
         screen.fill((40, 40, 40))
 
-        for vertex in vertexlist:
+        for vertex in G.vertex_list:
             if vertex.addingneighbor and addingneighbor:
                 pygame.draw.line(screen, (100,100,100), (vertex.x + 10, vertex.y + 10), pygame.mouse.get_pos())
 
